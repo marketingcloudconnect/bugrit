@@ -374,7 +374,7 @@ IF NOT EMPTY(@LeadID) THEN
 		SET @crmLead = row(@crmLeads, 1)
 		SET @FirstName = FIELD(@crmLead, 'FirstName')
 		SET @LastName = FIELD(@crmLead, 'LastName')
-		SET @Email = FIELD(@crmContact, 'Email')
+		SET @Email = FIELD(@crmLead, 'Email')
 	ENDIF
 ENDIF
 
