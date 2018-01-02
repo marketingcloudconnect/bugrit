@@ -352,7 +352,7 @@ IF NOT EMPTY(@CampaignMemberID) THEN
     ENDIF
 ENDIF
 
-IF NOT EMPTY(@Altern\ateKey) THEN
+IF NOT EMPTY(@AlternateKey) THEN
 	SET @MemberType = Substring(@AlternateKey,0,3)
 	IF @MemberType == '00Q' THEN
 		SET @MemberType = "Lead"
