@@ -1,0 +1,411 @@
+%%[
+/********************
+ * GET INITIAL VARS *
+ *******************/
+SET @CampaignMemberID = QueryParameter('CampaignMemberID')
+SET @AlternateKey = QueryParameter('AlternateKey')
+SET @LeadID = QueryParameter('LeadID')
+SET @ContactID = QueryParameter('ContactID')
+SET @CampaignName = QueryParameter('CampaignName')
+SET @Action = QueryParameter('Action')
+
+SET @MID = memberid
+IF MemberID == '7301771' THEN
+  /* SMC BU */
+  SET @SubscriptionListRecordTypeID = '0120I0000015Rq9QAE'
+ENDIF
+]%%
+%%[
+/* UPDATE EVENT CAMPAIGN REGISTRATION */
+IF (NOT EMPTY(@CampaignMemberID) AND @Action == "Cancel registration") THEN
+	SET @NewValue = QueryParameter('SetMemberStatus')
+	IF EMPTY(@NewValue) THEN
+		SET @NewValue = "De-registered"
+	ENDIF
+	SET @updated = UpdateSingleSalesforceObject("CampaignMember", @CampaignMemberID, "Status", @NewValue)
+	IF(@updated) THEN
+		SET @alert = "success"
+		SET @UpdateMessage = "Sorry to see you go. Your cancellation has been recorded."
+	ELSE
+		SET @alert = "danger"
+		SET @UpdateMessage = "There was a problem processing this request."
+	ENDIF
+ENDIF
+
+IF (NOT EMPTY(@CampaignMemberID) AND @Action == "Undo cancellation") THEN
+	SET @NewValue = QueryParameter('SetMemberStatus')
+	IF EMPTY(@NewValue) THEN
+		SET @NewValue = "Registered"
+	ENDIF
+	SET @updated = UpdateSingleSalesforceObject("CampaignMember", @CampaignMemberID, "Status", @NewValue)
+	IF(@updated) THEN
+		SET @alert = "success"
+		SET @UpdateMessage = "Welcome back! Your re-registration has been recorded."
+	ELSE
+		SET @alert = "danger"
+		SET @UpdateMessage = "There was a problem processing this request."
+	ENDIF
+ENDIF
+
+/* UPDATE SUBSCRIPTION CAMPAIGN STATUS */
+IF (NOT EMPTY(@CampaignMemberID) AND @Action == "Unsubscribe") THEN
+	SET @updated = UpdateSingleSalesforceObject("CampaignMember", @CampaignMemberID, "ChannelEmail__c", "false")
+	IF(@updated) THEN
+		SET @alert = "success"
+		SET @UpdateMessage = "You have been unsubscribed from this list. Sorry to see you go."
+	ELSE
+		SET @alert = "danger"
+		SET @UpdateMessage = "There was a problem processing this request."
+	ENDIF
+ENDIF
+
+IF (NOT EMPTY(@CampaignMemberID) AND @Action == "Subscribe") THEN
+	SET @updated = UpdateSingleSalesforceObject("CampaignMember", @CampaignMemberID, "ChannelEmail__c", "true")
+	IF(@updated) THEN
+		SET @alert = "success"
+		SET @UpdateMessage = "You are now subscribed. Welcome to the list!"
+	ELSE
+		SET @alert = "danger"
+		SET @UpdateMessage = "There was a problem processing this request."
+	ENDIF
+ENDIF
+
+
+
+/*****************************
+ * UPDATE SUBSCRIPTION LISTS *
+ ****************************/
+IF @Action == "Save changes" THEN
+	SET @crmAllSubscriptionLists = RetrieveSalesforceObjects('Campaign', 'Id,Name,PreferencePage__c,RecordTypeId,Public_List_Description__c,Public_Display_Name__c,Channel_Type__c','RecordTypeId','=',@SubscriptionListRecordTypeID,'PreferencePage__c','=','true')
+	SET @listCount = rowcount(@crmAllSubscriptionLists)
+	SET @subscriptionsUpdated = False
+	SET @today = Format(Now(),"yyyy-MM-dd")
+	]%%
+	<script runat="server" type="text/javascript">
+	    Platform.Load("core","1"); 
+	    try {
+	</script>
+	%%[
+
+
+	/* UPDATE SUBSCRIPTION LIST */
+	FOR @i = 1 TO @listCount DO
+		SET @thisSubscriptionList = ROW(@crmAllSubscriptionLists, @i)
+		SET @thisSubscriptionListID = FIELD(@thisSubscriptionList, 'Id')
+		SET @thisEmailUpdate = QueryParameter(CONCAT('setemail', @thisSubscriptionListID))
+		SET @thisSMSUpdate = QueryParameter(CONCAT('setsms', @thisSubscriptionListID))
+		SET @optedInEmail = False
+		SET @optedInSMS = False
+
+
+
+
+
+		/* Email opt-in */
+		IF (NOT EMPTY(@thisEmailUpdate)) AND @thisEmailUpdate == 'true' THEN
+			]%%  <h3 class="debug">EMAIL OPT IN</h3>  %%[
+			]%% <div class="debug">LongSFID(@AlternateKey): %%=v(LongSFID(@AlternateKey))=%%</div> %%[
+			]%% <div class="debug">thisSubscriptionListID: %%=v(@thisSubscriptionListID)=%%</div> %%[
+			SET @crmListMember = ""
+			SET @crmListMembers = RetrieveSalesforceObjects(
+				'CampaignMember',
+				'Id,ChannelEmail__c, Active__c, Email_Unsubscribed_Date__c, Email_Unsubscribed_Source__c, Email_Subscribed_Date__c, Email_Subscription_Source__c',
+				'Lead_Contact_ID_18_digits__c','=',LongSFID(@AlternateKey),
+				'CampaignId','=',@thisSubscriptionListID
+			)
+			IF rowcount(@crmListMembers) > 0 THEN
+				]%% <div class="debug">Email Opt-in - CampaignMember object exists and will be updated </div> %%[
+				SET @crmListMember = ROW(@crmListMembers, 1)
+				]%% <div class="debug">PreUpdate Email_Subscribed_Date__c: %%=FIELD(@crmListMember, 'Email_Subscribed_Date__c')=%%</div> %%[
+				]%% <div class="debug">PreUpdate Email_Unsubscribed_Source__c: %%=FIELD(@crmListMember, 'Email_Unsubscribed_Source__c')=%%</div> %%[
+				SET @crmListMemberID = FIELD(@crmListMember, 'Id')
+				SET @updated = UpdateSingleSalesforceObject("CampaignMember", @crmListMemberID, 
+					"ChannelEmail__c", 'true',
+					"Active__c","true",
+					"Email_Unsubscribed_Date__c",'1970-01-01',
+					"Email_Unsubscribed_Source__c","-",
+				)
+				IF @updated THEN
+					SET @subscriptionsUpdated = true
+					IF(EMPTY(FIELD(@crmListMember, 'Email_Subscription_Source__c'))) THEN
+						UpdateSingleSalesforceObject("CampaignMember", @crmListMemberID, 
+							"Email_Subscription_Source__c","Registered on preference centre",
+							"Email_Subscribed_Date__c",@today
+						)
+					ENDIF
+				ELSE
+					SET @subscriptionsUpdatedError = CONCAT("Email Opt-in - Error opting in existing Subscription Member: ", @crmListMemberID) 
+				ENDIF
+			ELSE
+				]%% <div class="debug">Email Opt-in - CampaignMember object doesn't exist and will need to be created </div> %%[
+				IF Substring(@AlternateKey,0,3) == '00Q' THEN
+					SET @LeadContactField = "LeadId"
+				ELSEIF Substring(@AlternateKey,0,3) == '003' THEN
+					SET @LeadContactField = "ContactId"
+				ENDIF
+				]%% <div class="debug">LeadContactField: %%=v(@LeadContactField)=%% </div> %%[
+				]%% <div class="debug">AlternateKey: %%=v(@AlternateKey)=%% </div> %%[
+				]%% <div class="debug">Substring(@AlternateKey,0,3): %%=Substring(@AlternateKey,0,3)=%% </div> %%[
+				]%% <div class="debug">ContactID: %%=v(@ContactID)=%% </div> %%[
+				]%% <div class="debug">LeadID: %%=v(@LeadID)=%% </div> %%[
+				SET @CampaignMemberID = CreateSalesforceObject("CampaignMember", 6,
+					@LeadContactField, @AlternateKey,
+					"CampaignId",@thisSubscriptionListID,
+					"ChannelEmail__c", 'true',
+					"Active__c","true",
+					"Email_Subscription_Source__c","Registered on preference centre",
+					"Email_Subscribed_Date__c",@today
+				)
+				SET @subscriptionsUpdated = true
+			ENDIF
+		ENDIF /* End Email opt-in */
+
+
+
+
+		/* SMS opt-in */
+		IF (NOT EMPTY(@thisSMSUpdate)) AND @thisSMSUpdate == 'true' THEN
+			]%%  <h3 class="debug">SMS OPT IN</h3>  %%[
+			]%% <div class="debug">LongSFID(@AlternateKey): %%=v(LongSFID(@AlternateKey))=%%</div> %%[
+			]%% <div class="debug">thisSubscriptionListID: %%=v(@thisSubscriptionListID)=%%</div> %%[
+			SET @crmListMember = ""
+			SET @crmListMembers = RetrieveSalesforceObjects(
+				'CampaignMember',
+				'Id,ChannelSMS__c, Active__c, SMS_Unsubscribed_Date__c, SMS_Unsubscribed_Source__c, SMS_Subscribed_Date__c, SMS_Subscription_Source__c',
+				'Lead_Contact_ID_18_digits__c','=',LongSFID(@AlternateKey),
+				'CampaignId','=',@thisSubscriptionListID
+			)
+			IF rowcount(@crmListMembers) > 0 THEN
+				]%% <div class="debug">SMS Opt-in - CampaignMember object exists and will be updated </div> %%[
+				SET @crmListMember = ROW(@crmListMembers, 1)
+				]%% <div class="debug">PreUpdate SMS_Subscribed_Date__c: %%=FIELD(@crmListMember, 'SMS_Subscribed_Date__c')=%%</div> %%[
+				]%% <div class="debug">PreUpdate SMS_Unsubscribed_Source__c: %%=FIELD(@crmListMember, 'SMS_Unsubscribed_Source__c')=%%</div> %%[
+				SET @crmListMemberID = FIELD(@crmListMember, 'Id')
+				SET @updated = UpdateSingleSalesforceObject("CampaignMember", @crmListMemberID, 
+					"ChannelSMS__c", 'true',
+					"Active__c","true",
+					"SMS_Unsubscribed_Date__c",'1970-01-01',
+					"SMS_Unsubscribed_Source__c","-",
+				)
+				IF @updated THEN
+					SET @subscriptionsUpdated = true
+					IF(EMPTY(FIELD(@crmListMember, 'SMS_Subscription_Source__c'))) THEN
+						UpdateSingleSalesforceObject("CampaignMember", @crmListMemberID, 
+							"SMS_Subscription_Source__c","Registered on preference centre",
+							"SMS_Subscribed_Date__c",@today
+						)
+					ENDIF
+				ELSE
+					SET @subscriptionsUpdatedError = CONCAT("SMS Opt-in - Error opting in existing Subscription Member: ", @crmListMemberID) 
+				ENDIF
+			ELSE
+				]%% <div class="debug">SMS Opt-in - CampaignMember object doesn't exist and will need to be created </div> %%[
+				IF Substring(@AlternateKey,0,3) == '00Q' THEN
+					SET @LeadContactField = "LeadId"
+				ELSEIF Substring(@AlternateKey,0,3) == '003' THEN
+					SET @LeadContactField = "ContactId"
+				ENDIF
+				]%% <div class="debug">LeadContactField: %%=v(@LeadContactField)=%% </div> %%[
+				]%% <div class="debug">AlternateKey: %%=v(@AlternateKey)=%% </div> %%[
+				]%% <div class="debug">Substring(@AlternateKey,0,3): %%=Substring(@AlternateKey,0,3)=%% </div> %%[
+				]%% <div class="debug">ContactID: %%=v(@ContactID)=%% </div> %%[
+				]%% <div class="debug">LeadID: %%=v(@LeadID)=%% </div> %%[
+				SET @CampaignMemberID = CreateSalesforceObject("CampaignMember", 6,
+					@LeadContactField, @AlternateKey,
+					"CampaignId",@thisSubscriptionListID,
+					"ChannelSMS__c", 'true',
+					"Active__c","true",
+					"SMS_Subscription_Source__c","Registered on preference centre",
+					"SMS_Subscribed_Date__c",@today
+				)
+				SET @subscriptionsUpdated = true
+			ENDIF
+		ENDIF /* End SMS opt-in */
+
+
+
+
+		/* Email opt-out */
+		IF (NOT EMPTY(@thisEmailUpdate)) AND @thisEmailUpdate == 'false' THEN
+			]%%  <h3 class="debug">EMAIL OPT OUT</h3>  %%[
+			]%% <div class="debug">LongSFID(@AlternateKey): %%=v(LongSFID(@AlternateKey))=%%</div> %%[
+			]%% <div class="debug">thisSubscriptionListID: %%=v(@thisSubscriptionListID)=%%</div> %%[
+			SET @crmListMember = ""
+			SET @crmListMembers = RetrieveSalesforceObjects(
+				'CampaignMember',
+				'Id,ChannelEmail__c, Active__c, Email_Unsubscribed_Date__c, Email_Unsubscribed_Source__c, Email_Subscribed_Date__c, Email_Subscription_Source__c',
+				'Lead_Contact_ID_18_digits__c','=',LongSFID(@AlternateKey),
+				'CampaignId','=',@thisSubscriptionListID
+			)
+			IF rowcount(@crmListMembers) > 0 THEN
+				]%% <div class="debug">Email Opt-out - CampaignMember object exists and will be updated </div> %%[
+				SET @crmListMember = ROW(@crmListMembers, 1)
+				]%% <div class="debug">PreUpdate Email_Subscribed_Date__c: %%=FIELD(@crmListMember, 'Email_Subscribed_Date__c')=%%</div> %%[
+				]%% <div class="debug">PreUpdate Email_Unsubscribed_Source__c: %%=FIELD(@crmListMember, 'Email_Unsubscribed_Source__c')=%%</div> %%[
+				]%% <div class="debug">CampaignId: %%=v(@CampaignId)=%%</div> %%[
+				SET @crmListMemberID = FIELD(@crmListMember, 'Id')
+				SET @updated = UpdateSingleSalesforceObject("CampaignMember", @crmListMemberID, 
+					"ChannelEmail__c", 'false',
+					"Email_Unsubscribed_Date__c",@today,
+					"Email_Unsubscribed_Source__c","Unsubscribed on preference centre",
+				)
+				IF @updated THEN
+					SET @subscriptionsUpdated = true
+					IF EMPTY(@CampaignID) THEN
+					    SET @CampaignID = QueryParameter('CampaignID')
+					ENDIF
+					IF NOT EMPTY(@CampaignID) THEN
+						]%% <div class="debug">Email_Unsubscribed_Source_Campaign__c is beign updated - @crmListMemberID: %%=v(@crmListMemberID)=%%</div> %%[
+						UpdateSingleSalesforceObject("CampaignMember", @crmListMemberID,
+							"Email_Unsubscribed_Source_Campaign__c",@CampaignID
+						)
+					ENDIF
+				ELSE
+					SET @subscriptionsUpdatedError = CONCAT("Email Opt-out - Error opting out existing Subscription Member: ", @crmListMemberID) 
+				ENDIF
+			ELSE
+				]%% <div class="debug">Email Opt-out - CampaignMember object doesn't exist therefore has nothing to opt out of.</div> %%[
+			ENDIF
+		ENDIF /* End Email opt-out */
+
+
+
+
+
+		/* SMS opt-out */
+		IF (NOT EMPTY(@thisSMSUpdate)) AND @thisSMSUpdate == 'false' THEN
+			]%%  <h3 class="debug">SMS OPT OUT</h3>  %%[
+			]%% <div class="debug">LongSFID(@AlternateKey): %%=v(LongSFID(@AlternateKey))=%%</div> %%[
+			]%% <div class="debug">thisSubscriptionListID: %%=v(@thisSubscriptionListID)=%%</div> %%[
+			SET @crmListMember = ""
+			SET @crmListMembers = RetrieveSalesforceObjects(
+				'CampaignMember',
+				'Id,ChannelSMS__c, Active__c, SMS_Unsubscribed_Date__c, SMS_Unsubscribed_Source__c, SMS_Subscribed_Date__c, SMS_Subscription_Source__c',
+				'Lead_Contact_ID_18_digits__c','=',LongSFID(@AlternateKey),
+				'CampaignId','=',@thisSubscriptionListID
+			)
+			IF rowcount(@crmListMembers) > 0 THEN
+				]%% <div class="debug">SMS Opt-out - CampaignMember object exists and will be updated </div> %%[
+				SET @crmListMember = ROW(@crmListMembers, 1)
+				]%% <div class="debug">PreUpdate SMS_Subscribed_Date__c: %%=FIELD(@crmListMember, 'SMS_Subscribed_Date__c')=%%</div> %%[
+				]%% <div class="debug">PreUpdate SMS_Unsubscribed_Source__c: %%=FIELD(@crmListMember, 'SMS_Unsubscribed_Source__c')=%%</div> %%[
+				]%% <div class="debug">CampaignId: %%=v(@CampaignId)=%%</div> %%[
+				SET @crmListMemberID = FIELD(@crmListMember, 'Id')
+				SET @updated = UpdateSingleSalesforceObject("CampaignMember", @crmListMemberID, 
+					"ChannelSMS__c", 'false',
+					"SMS_Unsubscribed_Date__c",@today,
+					"SMS_Unsubscribed_Source__c","Unsubscribed on preference centre",
+				)
+				IF @updated THEN
+					SET @subscriptionsUpdated = true
+					IF EMPTY(@CampaignID) THEN
+					    SET @CampaignID = QueryParameter('CampaignID')
+					ENDIF
+					IF NOT EMPTY(@CampaignID) THEN
+						]%% <div class="debug">SMS_Unsubscribed_Source_Campaign__c is beign updated - @crmListMemberID: %%=v(@crmListMemberID)=%%</div> %%[
+						UpdateSingleSalesforceObject("CampaignMember", @crmListMemberID,
+							"SMS_Unsubscribed_Source_Campaign__c",@CampaignID
+						)
+					ENDIF
+				ELSE
+					SET @subscriptionsUpdatedError = CONCAT("SMS Opt-out - Error opting out existing Subscription Member: ", @crmListMemberID) 
+				ENDIF
+			ELSE
+				]%% <div class="debug">SMS Opt-out - CampaignMember object doesn't exist therefore has nothing to opt out of.</div> %%[
+			ENDIF
+		ENDIF /* End SMS opt-out */
+		
+
+	NEXT @i
+
+
+
+	
+
+
+	]%%
+	<script type="text/javascript" runat="server">
+	    } catch (e) {
+	        Write("<strong>Parsing subs error</strong><br>e: " + e);
+	    }
+	</script>
+	%%[
+ENDIF
+]%%
+%%[
+
+/*****************
+ * LOOKUP FIELDS *
+ *****************/
+IF NOT EMPTY(@CampaignMemberID) THEN
+    SET @CampaignMemberID = Substring(@CampaignMemberID,1,15)
+    SET @crmCampaignMembers = RetrieveSalesforceObjects('CampaignMember', 'Status,CampaignId,Lead_Contact_ID_18_digits__c,ChannelEmail__c,ChannelSMS__c', 'Id', '=', @CampaignMemberID)
+    IF rowcount(@crmCampaignMembers) <= 0 THEN
+        SET @error = "Campaign member not found"
+    ELSE
+        SET @crmCampaignMember = row(@crmCampaignMembers, 1)
+		SET @CampaignID = FIELD(@crmCampaignMember, 'CampaignId')
+		SET @AlternateKey = FIELD(@crmCampaignMember, 'Lead_Contact_ID_18_digits__c')
+    	SET @CampaignMemberStatus = FIELD(@crmCampaignMember, 'Status')
+    	SET @SubscribeEmail = FIELD(@crmCampaignMember, 'ChannelEmail__c')
+    	SET @SubscribeSMS = FIELD(@crmCampaignMember, 'ChannelSMS__c')
+    ENDIF
+ENDIF
+
+IF NOT EMPTY(@AlternateKey) THEN
+	SET @MemberType = Substring(@AlternateKey,0,3)
+	IF @MemberType == '00Q' THEN
+		SET @MemberType = "Lead"
+		SET @LeadID = @AlternateKey
+	ELSEIF @MemberType == '003' THEN
+		SET @MemberType = "Contact"            
+		SET @ContactID = @AlternateKey
+	ENDIF
+ENDIF
+
+IF NOT EMPTY(@LeadID) THEN
+	SET @LeadID = Substring(@LeadID,1,15)
+	SET @crmLeads = RetrieveSalesforceObjects('Lead', 'FirstName,LastName,Broad_area_s_of_interest__c,Email', 'Id', '=', @LeadId)
+	SET @leadCount = rowcount(@crmLeads)
+	IF @leadCount <= 0 THEN
+		SET @error = "Lead not found"
+	ELSE
+		SET @AlternateKey = @LeadID
+		SET @crmLead = row(@crmLeads, 1)
+		SET @FirstName = FIELD(@crmLead, 'FirstName')
+		SET @LastName = FIELD(@crmLead, 'LastName')
+		SET @Email = FIELD(@crmLead, 'Email')
+	ENDIF
+ENDIF
+
+IF NOT EMPTY(@ContactID) THEN
+	SET @ContactID = Substring(@ContactID,1,15)
+	SET @crmContacts = RetrieveSalesforceObjects('Contact', 'FirstName,LastName,Broad_area_s_of_interest__c,Email', 'Id', '=', @ContactId)
+	SET @contactCount = rowcount(@crmContacts)
+	IF @contactCount <= 0 THEN
+		SET @error = "Contact not found"
+	ELSE
+		SET @AlternateKey = @ContactID
+		SET @crmContact = ROW(@crmContacts, 1)
+		SET @FirstName = FIELD(@crmContact, 'FirstName')
+		SET @LastName = FIELD(@crmContact, 'LastName')
+		SET @Email = FIELD(@crmContact, 'Email')
+	ENDIF
+ENDIF
+
+IF NOT EMPTY(@CampaignID) THEN
+	SET @crmCampaigns = RetrieveSalesforceObjects('Campaign', 'Name,Public_Display_Name__c,RecordTypeId', 'Id', '=', @CampaignId)
+	SET @campaignCount = rowcount(@crmCampaigns)
+	IF @campaignCount <= 0 THEN
+		SET @error = "Campaign not found"
+	ELSE
+		SET @crmCampaign = Row(@crmCampaigns, 1)
+		SET @CampaignName = Field(@crmCampaign, 'Name')
+		SET @CampaignPublicName = Field(@crmCampaign, 'Public_Display_Name__c')
+		SET @RecordTypeId = FIELD(@crmCampaign, 'RecordTypeId')
+		IF EMPTY(@CampaignPublicName) AND NOT EMPTY(@CampaignName) THEN
+			SET @CampaignPublicName = @CampaignName
+		ENDIF
+	ENDIF
+ENDIF
+]%%

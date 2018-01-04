@@ -1,0 +1,137 @@
+
+
+<script language="javascript" runat="server">
+Platform.Load("core", "1");
+try
+{
+</script>
+<!-- %%[
+SET @ListID = "2225"
+SET @SubscriberKey = QueryParameter("ID")
+SET @Submitted = RequestParameter("Submitted")
+IF EMPTY(@SubscriberKey) THEN SET @SubscriberKey = RequestParameter("ID") ELSE ENDIF
+
+IF EMPTY(@SubscriberKey) THEN 
+          SET @SubmitButton = "Hide"
+          SET @Header = "Error - subscriber not found"
+          SET @Message = "We were unable to unsubscribe you."
+
+          ELSE 
+
+  Set @emailaddr = Lookup('_ListSubscribers', 'EmailAddress', 'Subscriberkey', @SubscriberKey, 'ListType', 'Publication List', 'ListID', @ListID)
+
+    IF EMPTY(@emailaddr) THEN 
+          SET @SubmitButton = "Hide"
+          SET @Header = "Error - subscriber not found"
+          SET @Message = "We were unable to unsubscribe you."
+     ELSE 
+
+      Set @status = Lookup('_ListSubscribers', 'Status', 'Subscriberkey', @SubscriberKey, 'ListType', 'Publication List', 'ListID', @ListID)
+
+        IF @Status == "active" THEN
+  
+          IF @Submitted == "TRUE" THEN 
+  
+            SET @vcat_sub = CreateObject("Subscriber")
+              SetObjectProperty(@vcat_sub, "EmailAddress", @emailaddr)
+              SetObjectProperty(@vcat_sub, "SubscriberKey", @SubscriberKey)
+            
+            SET @subscription = CreateObject("SubscriberList")
+              SetObjectProperty(@subscription, "ID", @ListID) /* UCUAT Publication list - Private */ 
+              SetObjectProperty(@subscription, "IDSpecified", "true" )
+              SetObjectProperty(@subscription, "Status", "Unsubscribed" )
+              SetObjectProperty(@subscription, "StatusSpecified", "true" )
+              AddObjectArrayItem(@vcat_sub, "Lists", @subscription )
+
+            /* Update Subscriber List with status of Unsubscribed */
+              SET @vcat_statusCode = InvokeUpdate(@vcat_sub, @vcat_statusMsg, @errorCode)
+              IF @vcat_statusCode != "OK" THEN 
+                SET @Header = "Error - Technical "
+                SET @Message = " could not be removed from the publication list due to a technical error. Please press the Unsubscribe button to try again."
+                SET @SubmitButton = "Hide"
+              ELSE 
+                SET @Header = "Your subscription"
+                SET @Message = "You will no longer receive emails from the 2017 VTAC applicant list."
+                SET @SubmitButton = "Hide"
+              ENDIF
+          ELSE
+             /* Status is active but not submitted. */ 
+             /* Display the submit button */ 
+            SET @Header = "Your subscription"
+            SET @Message = "You are receiving emails because you've expressed an interest with Monash University through your VTAC application."
+            SET @SubmitButton = "Show"
+
+          ENDIF
+        
+        ELSE 
+          /* Status is not 'Active' */
+          /* Hide the submit button */ 
+          SET @SubmitButton = "Hide"
+          SET @Header = "Your subscription"
+          SET @Message = "You will no longer receive emails from the 2017 VTAC applicant list."           
+        ENDIF
+    ENDIF
+ENDIF
+]%% --> 
+
+ <script runat="server" language="javascript">
+} catch(err) { 
+  var e = Stringify(err.description);
+ Variable.SetValue("ErrorMessage",e);
+} 
+ </script>
+
+ <div class="container">
+ <div class="row">
+  <div class="banner">
+   <img src="//www.monash.edu/__data/assets/git_bridge/0006/509343/deploy/mysource_files/monash-logo.svg" alt="Monash University" style="max-width: 270px;">
+  </div>
+ </div>
+</div>
+<div class="container-fluid navigation-bar">
+ <div class="container">
+  <div class="row">
+   <div class="col-lg-12 navigation-link">
+    <a href="http://www.monash.edu/" class="text-link">Home</a>
+   </div>
+  </div>
+ </div>
+</div>
+<div class="container campaign-wrapper"> 
+  <div class="row" id="Message">
+    <div class="col-lg-12">
+      <div class="campaign-box">
+        <h2>%%=v(@Header)=%%</h2>
+        <p>%%=v(@Message)=%%</p>        
+        <p>If you have any questions, please contact us on 1800 MONASH (1800 666 274).</p>
+<!-- Show / Hide Button --> 
+        <!-- %%[ IF @SubmitButton == "Show" THEN ]%% --> 
+        <p></p><form action="%%=RequestParameter('PAGEURL')=%%" method="post">
+          <input type="hidden" name="ID" value="%%=v(@SubscriberKey)=%%">
+          <input type="hidden" name="Submitted" value="TRUE">
+          <input type="submit" name="Action" value="Unsubscribe" class="monash-button monash-button-dereg">          
+        </form>
+        <p></p>
+        <!-- %%[ ELSE ENDIF ]%% -->      
+      </div> 
+    </div>
+  </div>
+
+    
+</div> <!-- End campaign wrapper --> 
+<hr>
+
+<!-- include virtual="debug.shtml" -->
+<div class="container-fluid footer">
+ <div class="container">
+  <div class="row">
+   <div class="col-lg-10 footer-area">
+    Authorised by: Director, Office of Strategic Marketing and Communications. Maintained by: <a href="mailto:its-servicedesk@monash.edu" class="text-link">eSolutions ServiceDesk</a>
+    <br><br>
+    Copyright &copy; 2017 Monash University. ABN 12 377 614 012 <a href="http://www.monash.edu/accessibility">Accessibility</a> - <a href="http://www.monash.edu/disclaimer-copyright">Disclaimer and copyright</a> - <a href="http://www.monash.edu/privacy">Privacy</a>, Monash University CRICOS Provider Number: 00008C, Monash College CRICOS Provider Number: 01857J. Monash University is a registered higher education provider under the TEQSA Act 2011.
+    <br><br>
+    We acknowledge and pay respects to the Elders and Traditional Owners of the land on which our five Australian campuses stand. <a href="http://www.monash.edu/about/indigenous" class="text-link">Information for Indigenous Australians</a>
+   </div>
+  </div>
+ </div>
+</div>
