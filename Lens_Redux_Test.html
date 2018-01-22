@@ -13,6 +13,7 @@ try
 /* SET @SuccessPage = RequestParameter("SuccessPage") */ 
 SET @EmailAddress = "richard.raudon@monash.edu"
 SET @SubmittedDate = SystemDateToLocalDate(NOW())
+SET @Source = "Source"
 
  IF EMPTY(@SuccessPage) THEN
    SET @SuccessPage = "https://lens.monash.edu/success"
@@ -40,12 +41,14 @@ AddObjectArrayItem(@Monash_Lens, "Attributes", @Monash_LensSource)
 
 SET @Monash_Lens_Status = InvokeCreate(@Monash_Lens, @ts_StatusMsg, @ts_ErrorCode)
 
-IF NOT EMPTY(@ts_ErrorCode) THEN SET @ErrorMessage = @ts_Status_Msg ENDIF
-
-IF EMPTY(@ErrorMessage) THEN SET @ErrorMessage = "No errors detected" 
-	ELSE
+IF @Monash_Lens_Status == "ERROR" THEN SET @ErrorMessage = @ts_Status_Msg 
 UPSERTDATA("Lens_Error_Log", 1, "SubscriberKey", @SubscriberKey, "SubscriberKey", @SubscriberKey, "EmailAddress", @EmailAddress, "ErrorDate", SystemDateToLocalDate(Now()), "ErrorCode", @ts_ErrorCode, "StatusMessage", @ts_Status_Msg)
-ENDIF 
+
+ELSE 
+
+SET @ErrorMessage = "No errors detected" 
+
+ENDIF
 
 /* REDIRECT(@SuccessPage) */
 
