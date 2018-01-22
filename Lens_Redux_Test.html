@@ -17,6 +17,10 @@ SET @EmailAddress = RequestParameter("Email")
 SET @Source = RequestParameter("Source")  
 SET @SuccessPage = RequestParameter("SuccessPage")
 
+IF EMPTY(@SuccessPage) THEN
+   SET @SuccessPage = "https://lens.monash.edu"
+ENDIF
+
 /* Duplicate checker 
 Set @DuplicateID = Lookup("TRG_Monash_Lens", "SubscriberKey", "EmailAddress", @EmailAddress)
 IF NOT EMPTY(@DuplicateID) THEN SET @SubscriberKey = @DuplicateID 
@@ -24,9 +28,7 @@ ENDIF
 */ 
 
 
-IF EMPTY(@SuccessPage) THEN
-   SET @SuccessPage = "https://lens.monash.edu"
-  ENDIF
+
 
 /* Build the triggered send */ 
 
