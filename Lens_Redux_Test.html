@@ -7,51 +7,57 @@ try
 {
 </script>
 
-%%[ SET @SubscriberKey = GUID()
-/* SET @EmailAddress = RequestParameter("Email") */ 
-/* SET @Source = RequestParameter("Source") */ 
-/* SET @SuccessPage = RequestParameter("SuccessPage") */ 
-SET @EmailAddress = "richard.raudon@monash.edu"
+%%[
+/* Set system variables */ 
+SET @SubscriberKey = GUID()
 SET @SubmittedDate = SystemDateToLocalDate(NOW())
-SET @Source = "Source"
 
- IF EMPTY(@SuccessPage) THEN
-   SET @SuccessPage = "https://lens.monash.edu/success"
+/* Retrieve information passed from submission form */
+SET @EmailAddress = RequestParameter("Email")
+SET @Source = RequestParameter("Source")  
+SET @SuccessPage = RequestParameter("SuccessPage")
+
+IF EMPTY(@SuccessPage) THEN
+   SET @SuccessPage = "https://lens.monash.edu"
   ENDIF
 
+/* Build the triggered send */ 
+
 SET @Monash_Lens = CreateObject("TriggeredSend")         
+
 SET @Monash_LensDef = CreateObject("TriggeredSendDefinition")
-SetObjectProperty(@Monash_LensDef, "CustomerKey", "6743")
-SetObjectProperty(@Monash_Lens, "TriggeredSendDefinition",@Monash_LensDef)
+	SetObjectProperty(@Monash_LensDef, "CustomerKey", "6743")
+	SetObjectProperty(@Monash_Lens, "TriggeredSendDefinition", @Monash_LensDef)
 
 SET @Monash_Lens_sub = CreateObject("Subscriber")
-SetObjectProperty(@Monash_Lens_sub, "EmailAddress", @EmailAddress)
-SetObjectProperty(@Monash_Lens_sub, "SubscriberKey", @SubscriberKey)
+	SetObjectProperty(@Monash_Lens_sub, "EmailAddress", @EmailAddress)
+	SetObjectProperty(@Monash_Lens_sub, "SubscriberKey", @SubscriberKey)
 AddObjectArrayItem(@Monash_Lens, "Subscribers", @Monash_Lens_sub)
 
 SET @Monash_LensSubmittedDate = CreateObject("Attribute")
-SetObjectProperty(@Monash_LensSubmittedDate, "Name", "SubmittedDate")
-SetObjectProperty(@Monash_LensSubmittedDate, "Value", @SubmittedDate)
+	SetObjectProperty(@Monash_LensSubmittedDate, "Name", "SubmittedDate")
+	SetObjectProperty(@Monash_LensSubmittedDate, "Value", @SubmittedDate)
 AddObjectArrayItem(@Monash_Lens, "Attributes", @Monash_LensSubmittedDate)
 
 SET @Monash_LensSource = CreateObject("Attribute")
-SetObjectProperty(@Monash_LensSource, "Name", "Source")
-SetObjectProperty(@Monash_LensSource, "Value", @Source)
+	SetObjectProperty(@Monash_LensSource, "Name", "Source")
+	SetObjectProperty(@Monash_LensSource, "Value", @Source)
 AddObjectArrayItem(@Monash_Lens, "Attributes", @Monash_LensSource)
 
+/* InvokeCreate */ 
 SET @Monash_Lens_Status = InvokeCreate(@Monash_Lens, @ts_StatusMsg, @ts_ErrorCode)
 
+/* Check for errors and log them */ 
 IF @Monash_Lens_Status == "ERROR" THEN SET @ErrorMessage = @ts_Status_Msg 
-UPSERTDATA("Lens_Error_Log", 1, "ErrorID", GUID(), "SubscriberKey", @SubscriberKey, "EmailAddress", @EmailAddress, "ErrorDate", SystemDateToLocalDate(Now()), "ErrorCode", @ts_ErrorCode, "StatusMessage", @ts_Status_Msg)
-
+	UPSERTDATA("Lens_Error_Log", 1, "ErrorID", GUID(), "SubscriberKey", @SubscriberKey, "EmailAddress", @EmailAddress, "ErrorDate", SystemDateToLocalDate(Now()), "ErrorCode", @ts_ErrorCode, "StatusMessage", @ts_Status_Msg)
 ELSE 
-
-SET @ErrorMessage = "No errors detected"  
-
+	SET @ErrorMessage = "No errors detected"  
 ENDIF
 
-/* REDIRECT(@SuccessPage) */
+/* Bounce out to main page */ 
+REDIRECT(@SuccessPage)
 
+/* If something went wrong, display the error */ 
 ]%%
 
 <script runat="server" language="javascript">
