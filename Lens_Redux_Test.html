@@ -21,7 +21,7 @@ SET @Source = "Source"
 
 SET @Monash_Lens = CreateObject("TriggeredSend")         
 SET @Monash_LensDef = CreateObject("TriggeredSendDefinition")
-SetObjectProperty(@Monash_LensDef, "CustomerKey", "Monash_Lens_Welcome")
+SetObjectProperty(@Monash_LensDef, "CustomerKey", "6743")
 SetObjectProperty(@Monash_Lens, "TriggeredSendDefinition",@Monash_LensDef)
 
 SET @Monash_Lens_sub = CreateObject("Subscriber")
