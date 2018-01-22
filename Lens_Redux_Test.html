@@ -8,12 +8,14 @@ try
 </script>
 
 %%[ SET @SubscriberKey = GUID()
-SET @EmailAddress = RequestParameter("Email")
-SET @Source = RequestParameter("Source")
-SET @SuccessPage = RequestParameter("SuccessPage")
+/* SET @EmailAddress = RequestParameter("Email") */ 
+/* SET @Source = RequestParameter("Source") */ 
+/* SET @SuccessPage = RequestParameter("SuccessPage") */ 
+SET @EmailAddress = "richard.raudon@monash.edu"
 SET @SubmittedDate = SystemDateToLocalDate(NOW())
+
  IF EMPTY(@SuccessPage) THEN
-   SET @SuccessPage = "https://lens.monash.edu/"
+   SET @SuccessPage = "https://lens.monash.edu/success"
   ENDIF
 
 SET @Monash_Lens = CreateObject("TriggeredSend")         
@@ -37,10 +39,11 @@ SetObjectProperty(@Monash_LensSource, "Value", @Source)
 AddObjectArrayItem(@Monash_Lens, "Attributes", @Monash_LensSource)
 
 SET @Monash_Lens_Status = InvokeCreate(@Monash_Lens, @ts_StatusMsg, @ts_ErrorCode)
-IF @Monash_Lens_Status != 1 THEN SET @ErrorMessage = @ts_Status_Msg ENDIF
+
+IF NOT EMPTY(@ts_ErrorCode) THEN SET @ErrorMessage = @ts_Status_Msg ENDIF
 
 IF EMPTY(@ErrorMessage) THEN SET @ErrorMessage = "No errors detected" 
-ELSE
+	ELSE
 UPSERTDATA("Lens_Error_Log", 1, "SubscriberKey", @SubscriberKey, "SubscriberKey", @SubscriberKey, "EmailAddress", @EmailAddress, "ErrorDate", SystemDateToLocalDate(Now()), "ErrorCode", @ts_ErrorCode, "StatusMessage", @ts_Status_Msg)
 ENDIF 
 
