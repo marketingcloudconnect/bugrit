@@ -1,0 +1,66 @@
+<!doctype html>
+<html>
+<head>
+<script language=javascript runat=server>
+Platform.Load("core", "1");
+try
+{
+</script>
+
+%%[ SET @SubscriberKey = GUID()
+SET @EmailAddress = RequestParameter("Email")
+SET @Source = RequestParameter("Source")
+SET @SuccessPage = RequestParameter("SuccessPage")
+SET @SubmittedDate = SystemDateToLocalDate(NOW())
+ IF EMPTY(@SuccessPage) THEN
+   SET @SuccessPage = "https://lens.monash.edu/"
+  ENDIF
+
+SET @Monash_Lens = CreateObject("TriggeredSend")         
+SET @Monash_LensDef = CreateObject("TriggeredSendDefinition")
+SetObjectProperty(@Monash_LensDef, "CustomerKey", "Monash_Lens_Welcome")
+SetObjectProperty(@Monash_Lens, "TriggeredSendDefinition",@Monash_LensDef)
+
+SET @Monash_Lens_sub = CreateObject("Subscriber")
+SetObjectProperty(@Monash_Lens_sub, "EmailAddress", @EmailAddress)
+SetObjectProperty(@Monash_Lens_sub, "SubscriberKey", @SubscriberKey)
+AddObjectArrayItem(@Monash_Lens, "Subscribers", @Monash_Lens_sub)
+
+SET @Monash_LensSubmittedDate = CreateObject("Attribute")
+SetObjectProperty(@Monash_LensSubmittedDate, "Name", "SubmittedDate")
+SetObjectProperty(@Monash_LensSubmittedDate, "Value", @SubmittedDate)
+AddObjectArrayItem(@Monash_Lens, "Attributes", @Monash_LensSubmittedDate)
+
+SET @Monash_LensSource = CreateObject("Attribute")
+SetObjectProperty(@Monash_LensSource, "Name", "Source")
+SetObjectProperty(@Monash_LensSource, "Value", @Source)
+AddObjectArrayItem(@Monash_Lens, "Attributes", @Monash_LensSource)
+
+SET @Monash_Lens_Status = InvokeCreate(@Monash_Lens, @ts_StatusMsg, @ts_ErrorCode)
+IF @Monash_Lens_Status != 1 THEN SET @ErrorMessage = @ts_Status_Msg ENDIF
+
+IF EMPTY(@ErrorMessage) THEN SET @ErrorMessage = "No errors detected" ENDIF 
+
+REDIRECT(@SuccessPage)
+
+]%%
+
+<script runat="server" language="javascript">
+} catch(err) { 
+  var e = Stringify(err.description);
+ Variable.SetValue("ErrorMessage",e);
+} 
+ </script>
+
+</head>
+<body>
+  <b>Messages</b><br/>
+  %%=v(@ErrorMessage)=%%<br/>
+  %%=v(@Monash_Lens_Status)=%%
+</body>
+
+</html>
+
+
+
+
