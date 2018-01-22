@@ -47,7 +47,7 @@ IF EMPTY(@ErrorMessage) THEN SET @ErrorMessage = "No errors detected"
 UPSERTDATA("Lens_Error_Log", 1, "SubscriberKey", @SubscriberKey, "SubscriberKey", @SubscriberKey, "EmailAddress", @EmailAddress, "ErrorDate", SystemDateToLocalDate(Now()), "ErrorCode", @ts_ErrorCode, "StatusMessage", @ts_Status_Msg)
 ENDIF 
 
-REDIRECT(@SuccessPage)
+/* REDIRECT(@SuccessPage) */
 
 ]%%
 
@@ -62,7 +62,11 @@ REDIRECT(@SuccessPage)
 <body>
   <b>Messages</b><br/>
   %%=v(@ErrorMessage)=%%<br/>
-  %%=v(@Monash_Lens_Status)=%%
+  %%=v(@Monash_Lens_Status)=%%<br/>
+  %%=v(@ts_ErrorCode)=%% <br/>
+  %%=v(@ts_StatusMsg)=%%<br/>
+  %%=v(@Monash_Lens_Status)=%%<br/>
+
 </body>
 
 </html>
