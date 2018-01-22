@@ -39,7 +39,10 @@ AddObjectArrayItem(@Monash_Lens, "Attributes", @Monash_LensSource)
 SET @Monash_Lens_Status = InvokeCreate(@Monash_Lens, @ts_StatusMsg, @ts_ErrorCode)
 IF @Monash_Lens_Status != 1 THEN SET @ErrorMessage = @ts_Status_Msg ENDIF
 
-IF EMPTY(@ErrorMessage) THEN SET @ErrorMessage = "No errors detected" ENDIF 
+IF EMPTY(@ErrorMessage) THEN SET @ErrorMessage = "No errors detected" 
+ELSE
+UPSERTDATA("Lens_Error_Log", 1, "SubscriberKey", @SubscriberKey, "SubscriberKey", @SubscriberKey, "EmailAddress", @EmailAddress, "ErrorDate", SystemDateToLocalDate(Now()), "ErrorCode", @ts_ErrorCode, "StatusMessage", @ts_Status_Msg)
+ENDIF 
 
 REDIRECT(@SuccessPage)
 
